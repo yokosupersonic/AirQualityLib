@@ -1,0 +1,10 @@
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+
+# Large data files (do not commit)
+*.tif
+*.tiff
+*.nc
+*.grib
+*.zip
