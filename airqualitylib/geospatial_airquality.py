@@ -216,4 +216,4 @@ def period_diff(da, period_a: Tuple[str, str], period_b: Tuple[str, str], agg: s
 
 def hello():
     """Simple test function."""
-    print("AirQuality-Lib skeleton is ready!")
+    return "Hello, AirQualityLib"

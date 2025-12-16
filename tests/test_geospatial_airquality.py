@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
-import geospatial_airquality as aq
+from airqualitylib import geospatial_airquality as aq
+
 
 class TestBasicMetrics(unittest.TestCase):
 
