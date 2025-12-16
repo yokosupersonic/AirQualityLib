@@ -1,11 +1,15 @@
+# Python
 __pycache__/
+*.pyc
 .ipynb_checkpoints/
-.DS_Store
 
-# Large data files (do not commit)
+# Local datasets (do NOT commit)
+data/
+*.nc
 *.tif
 *.tiff
-*.nc
-*.grib
-*.zip
-.idea/
+*.gpkg
+*.geojson
+
+# OS
+.DS_Store
