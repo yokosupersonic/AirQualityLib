@@ -2,6 +2,9 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+*.egg-info/
+dist/
+build/
 
 # Local datasets (do NOT commit)
 data/

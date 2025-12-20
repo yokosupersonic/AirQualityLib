@@ -21,3 +21,5 @@ dependencies:
   # notebook
   - jupyterlab
   - ipykernel
+  # testing
+  - pytest
