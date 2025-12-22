@@ -13,6 +13,11 @@ Lightweight helpers for geospatial air-quality workflows: load NetCDF rasters, a
 - Export helpers: GeoTIFF export and plotting colormap for the 6 landcover classes.
 
 ---
+## Workflow
+
+![AirQualityLib workflow](images/workflow.svg)
+
+---
 
 **Install**
 - Conda (recommended):
