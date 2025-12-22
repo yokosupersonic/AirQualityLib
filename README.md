@@ -58,7 +58,7 @@ Testing
 
 Examples
 - See [example/example.ipynb](example/example.ipynb) for an end-to-end walkthrough.
-- Sample data download: <Google Drive link here>. After downloading, place the files under [example/example_data](example/example_data).
+- Sample data download: <[Google Drive link here](https://drive.google.com/drive/folders/1Ohk_1sAGYlQYqnZ10WQNBUb2UrqHePyH?usp=sharing)>. After downloading, place the files under [example/example_data](example/example_data).
 
 License
 - MIT License; see [LICENSE](LICENSE).
