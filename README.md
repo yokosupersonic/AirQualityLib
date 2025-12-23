@@ -1,11 +1,12 @@
 AirQualityLib
 ==============
 
-Lightweight helpers for geospatial air-quality workflows: load NetCDF rasters, align with landcover, clip to administrative areas, compute monthly means, and export results. Core functions live in [airqualitylib/geospatial_airquality.py](airqualitylib/geospatial_airquality.py).
+Lightweight helpers for geospatial air-quality analysis, designed to support common preprocessing, aggregation, and landcover-based workflows on NetCDF datasets. Core functionality is implemented in [airqualitylib/geospatial_airquality.py](airqualitylib/geospatial_airquality.py).
 
 ---
 
-**Features**
+## Features
+- End-to-end geospatial air-quality workflow from NetCDF inputs to maps and statistics.
 - Load air-quality rasters (NetCDF) and administrative boundaries (GeoPackage), with built-in CRS normalization.
 - Clip air-quality grids to areas of interest using vector AOIs.
 - Temporal aggregation: monthly mean maps from time cubes.
@@ -14,12 +15,13 @@ Lightweight helpers for geospatial air-quality workflows: load NetCDF rasters, a
 
 ---
 ## Workflow
+The diagram below illustrates the typical end-to-end workflow supported by AirQualityLib, from raw air-quality and landcover NetCDF inputs to monthly aggregation, landcover-based analysis, and final maps and statistics.
 
 ![AirQualityLib workflow](images/workflow.svg)
 
 ---
 
-**Install**
+## Install
 - Conda (recommended):
 	1. `conda env create -f environment.yml`
 	2. `conda activate aq_env`
@@ -28,7 +30,8 @@ Lightweight helpers for geospatial air-quality workflows: load NetCDF rasters, a
 
 ---
 
-**Quickstart**
+## Quickstart
+The following example demonstrates a minimal workflow for computing monthly NO₂ statistics over a selected country.
 1) Load data
 ```python
 import xarray as xr
@@ -67,23 +70,24 @@ print(stats.head())
 
 ---
 
-**Data expectations**
+## Data expectations
 - Air quality rasters: NetCDF with `lat`, `lon`, and a `time` dimension for time cubes.
 - Landcover rasters: categorical NetCDF with `lat`/`lon`; default reclass mapping `DEFAULT_LCCS_TO_6CLASS` yields 6 macro classes.
 - Boundaries: GeoPackage layer in WGS84 (auto-normalized if not).
 
 ---
 
-**Testing**
-- Run unit tests: `pytest`
+## Testing
+Unit tests are provided in the `tests/` directory and cover the core functionality of the library.
+- Run unit tests: `pytest` 
 
 ---
 
-**Examples**
+## Examples
 - See [example/example.ipynb](example/example.ipynb) for an end-to-end walkthrough.
 - Sample data download: <[Google Drive link here](https://drive.google.com/drive/folders/1Ohk_1sAGYlQYqnZ10WQNBUb2UrqHePyH?usp=sharing)>. After downloading, place the files under [example/example_data](example/example_data).
 
 ---
 
-**License**
+## License
 - MIT License; see [LICENSE](LICENSE).
