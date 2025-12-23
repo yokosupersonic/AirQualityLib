@@ -3,6 +3,14 @@ AirQualityLib
 
 Lightweight helpers for geospatial air-quality analysis, designed to support common preprocessing, aggregation, and landcover-based workflows on NetCDF datasets. Core functionality is implemented in [airqualitylib/geospatial_airquality.py](airqualitylib/geospatial_airquality.py).
 
+<p align="center">
+  <img src="images/italy_no2_landcover.png" width="85%" />
+</p>
+
+<p align="center">
+  <em>Monthly mean NO₂ with land-cover overlay (example result)</em>
+</p>
+
 ---
 
 ## Features
