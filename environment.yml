@@ -9,17 +9,27 @@ dependencies:
   - numpy
   - pandas
 
-  # geospatial / raster stack
-  - geopandas
+  # netcdf backends (avoid xarray engine issues)
   - xarray
+  - netcdf4
+  - h5netcdf
+
+  # geospatial stack (stable I/O for GPKG + raster)
+  - geopandas
+  - pyogrio
+  - fiona
+  - gdal
+  - pyproj
+  - shapely
   - rasterio
   - rioxarray
 
-  # plotting (for notebook demo)
+  # plotting
   - matplotlib
 
   # notebook
   - jupyterlab
   - ipykernel
+
   # testing
   - pytest
