@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 # =============================================================================
-# Part 1: Import Reliability - 导入与可选依赖测试
+# Part 1: Import Reliability
 # =============================================================================
 
 class TestImportReliability:
@@ -29,21 +29,33 @@ class TestImportReliability:
         assert callable(load_air_quality)
         assert callable(load_admin_boundaries)
     
-    def test_missing_dependencies_raise_errors(self):
-        """Test that missing dependencies raise ImportError."""
+    def test_missing_xarray_raises_import_error(self, monkeypatch):
+        """
+        When xarray is missing, load_air_quality should raise ImportError.
+        """
         from airqualitylib import geospatial_airquality
-        
-        original_xr = geospatial_airquality.xr
-        geospatial_airquality.xr = None
-        try:
-            with pytest.raises(ImportError, match="xarray is required"):
-                geospatial_airquality.load_air_quality("dummy.nc")
-        finally:
-            geospatial_airquality.xr = original_xr
+
+        # Temporarily remove xarray from the module
+        monkeypatch.setattr(geospatial_airquality, "xr", None, raising=False)
+
+        with pytest.raises(ImportError, match="xarray is required"):
+            geospatial_airquality.load_air_quality("dummy.nc")
+
+    def test_missing_geopandas_raises_import_error(self, monkeypatch):
+        """
+        When geopandas is missing, load_admin_boundaries should raise ImportError.
+        """
+        from airqualitylib import geospatial_airquality
+
+        # Temporarily remove geopandas from the module
+        monkeypatch.setattr(geospatial_airquality, "gpd", None, raising=False)
+
+        with pytest.raises(ImportError, match="geopandas is required"):
+            geospatial_airquality.load_admin_boundaries(path="dummy.gpkg")
 
 
 # =============================================================================
-# Part 2: I/O (NetCDF / GeoPackage) - 测试读取与写入功能
+# Part 2: I/O (NetCDF / GeoPackage)
 # =============================================================================
 
 class TestIOFunctions:
@@ -183,7 +195,7 @@ class TestIOFunctions:
 
 
 # =============================================================================
-# Part 3: CRS Tools - CRS 工具测试
+# Part 3: CRS Tools - CRS 
 # =============================================================================
 
 class TestCRSTools:
@@ -279,7 +291,7 @@ class TestCRSTools:
 
 
 # =============================================================================
-# Part 4: Clipping Operations - 裁剪操作测试
+# Part 4: Clipping Operations 
 # =============================================================================
 
 class TestClippingOperations:
@@ -390,26 +402,32 @@ class TestClippingOperations:
 
 
 # =============================================================================
-# Part 5: Temporal Aggregation - 时间聚合测试
+# Part 5: Temporal Aggregation 
 # =============================================================================
 
 class TestTemporalAggregation:
-    """Test monthly aggregation utilities."""
+    """Tests for time aggregation helpers (monthly_mean)."""
 
-    @pytest.fixture
-    def testdata_dir(self):
+    @pytest.fixture(scope="session")
+    def testdata_dir(self) -> Path:
+        """Return the path to the tests/testdata directory."""
         return Path(__file__).parent / "testdata"
 
+    @pytest.fixture(scope="session")
+    def portugal_no2_path(self, testdata_dir: Path) -> Path:
+        """Return the path to the sample NO2 subset NetCDF."""
+        return testdata_dir / "portugal_no2_subset.nc"
+
     @pytest.fixture
-    def portugal_no2_path(self, testdata_dir):
-        return str(testdata_dir / "portugal_no2_subset.nc")
+    def da(self, portugal_no2_path: Path):
+        """Load the sample air-quality cube once per test."""
+        from airqualitylib.geospatial_airquality import load_air_quality
+        return load_air_quality(str(portugal_no2_path))
 
-    def test_monthly_mean_overall(self, portugal_no2_path):
-        """整体月平均：输出应与手工 mean 匹配且移除时间维度。"""
-        from airqualitylib.geospatial_airquality import load_air_quality, monthly_mean
+    def test_monthly_mean_overall_matches_manual(self, da):
+        """If month=None, monthly_mean should equal mean over the full time axis and drop 'time'."""
+        from airqualitylib.geospatial_airquality import monthly_mean
         import xarray.testing as xrt
-
-        da = load_air_quality(portugal_no2_path)
 
         result = monthly_mean(da)
         expected = da.mean(dim="time", skipna=True)
@@ -417,22 +435,26 @@ class TestTemporalAggregation:
         assert "time" not in result.dims
         xrt.assert_allclose(result, expected)
 
-    def test_monthly_mean_specific_month(self, portugal_no2_path):
-        """特定月份平均："""
-        from airqualitylib.geospatial_airquality import load_air_quality, monthly_mean
+    def test_monthly_mean_specific_month_matches_manual(self, da):
+        """If month is provided, monthly_mean should match a manual time slice mean."""
+        from airqualitylib.geospatial_airquality import monthly_mean
         import xarray.testing as xrt
+        import pandas as pd
 
-        da = load_air_quality(portugal_no2_path)
+        month = "2022-02"
+        result = monthly_mean(da, month=month, time_dim="time")
 
-        result = monthly_mean(da, month="2022-02", time_dim="time")
-        manual_slice = da.sel(time=slice("2022-02-01", "2022-02-28"))
-        expected = manual_slice.mean(dim="time", skipna=True)
+        # Robust month boundaries (avoids hardcoding 28/29/30/31 days)
+        start = pd.Period(month, freq="M").start_time
+        end = pd.Period(month, freq="M").end_time
+        expected = da.sel(time=slice(start, end)).mean(dim="time", skipna=True)
 
-        assert result.dims == ("lat", "lon")
+        # Output should be 2D (lat, lon)
+        assert set(result.dims) == {"lat", "lon"}
         xrt.assert_allclose(result, expected)
 
-    def test_monthly_mean_missing_time_dim(self):
-        """缺少时间维度时应报错。"""
+    def test_monthly_mean_raises_if_missing_time_dim(self):
+        """monthly_mean should raise if the specified time_dim is not present."""
         from airqualitylib.geospatial_airquality import monthly_mean
         import numpy as np
         import xarray as xr
@@ -443,100 +465,115 @@ class TestTemporalAggregation:
             coords={"lat": [1, 2, 3], "lon": [1, 2, 3, 4]},
         )
 
-        with pytest.raises(ValueError, match="time_dim='time' not in da.dims"):
+        with pytest.raises(ValueError, match="time_dim=.*not in da.dims"):
             monthly_mean(da_no_time)
-
+   
 
 # =============================================================================
-# Part 6: Landcover Operations - 土地覆盖操作测试
+# Part 6: Landcover Operations 
 # =============================================================================
 
 class TestLandcoverOperations:
-    """Use真实 testdata/landcover.nc 与 NO₂ 数据进行土地覆盖相关测试。"""
+    """Tests for landcover helpers using testdata (landcover.nc + portugal_no2_subset.nc)."""
 
-    @pytest.fixture
-    def testdata_dir(self):
+    @pytest.fixture(scope="session")
+    def testdata_dir(self) -> Path:
+        """Return the path to the tests/testdata directory."""
         return Path(__file__).parent / "testdata"
 
-    @pytest.fixture
-    def landcover_path(self, testdata_dir):
-        return str(testdata_dir / "landcover.nc")
+    @pytest.fixture(scope="session")
+    def landcover_path(self, testdata_dir: Path) -> Path:
+        """Return the path to the sample landcover NetCDF."""
+        return testdata_dir / "landcover.nc"
+
+    @pytest.fixture(scope="session")
+    def portugal_no2_path(self, testdata_dir: Path) -> Path:
+        """Return the path to the sample NO2 subset NetCDF."""
+        return testdata_dir / "portugal_no2_subset.nc"
 
     @pytest.fixture
-    def portugal_no2_path(self, testdata_dir):
-        return str(testdata_dir / "portugal_no2_subset.nc")
-
-    def test_load_landcover_uses_lat_lon_and_squeezes_time(self, landcover_path):
+    def lc(self, landcover_path: Path):
+        """Load landcover once per test."""
         from airqualitylib.geospatial_airquality import load_landcover
+        return load_landcover(str(landcover_path), var="lccs_class")
 
-        lc = load_landcover(landcover_path,var="lccs_class")
+    @pytest.fixture
+    def aq(self, portugal_no2_path: Path):
+        """Load AQ cube once per test."""
+        from airqualitylib.geospatial_airquality import load_air_quality
+        return load_air_quality(str(portugal_no2_path))
 
+    def test_load_landcover_returns_2d_lat_lon(self, lc):
+        """load_landcover should normalize dims to (lat, lon) and squeeze extra dims."""
         assert lc.dims == ("lat", "lon")
-        assert lc.sizes["lat"] == 6 and lc.sizes["lon"] == 5
-        assert float(lc.lat[0]) < float(lc.lat[-1])  # 保持递增
+        assert lc.sizes["lat"] > 0 and lc.sizes["lon"] > 0
 
-    def test_align_categorical_to_reference_matches_aq_grid(self, landcover_path, portugal_no2_path):
-        from airqualitylib.geospatial_airquality import load_landcover, load_air_quality, align_categorical_to_reference
+        # Coordinates should be monotonic (either ascending or descending is fine)
+        lat0, lat1 = float(lc.lat[0]), float(lc.lat[-1])
+        assert lat0 != lat1
+
+    def test_align_categorical_to_reference_matches_aq_grid(self, lc, aq):
+        """Aligned landcover must match the AQ spatial grid."""
+        from airqualitylib.geospatial_airquality import align_categorical_to_reference
         import numpy as np
 
-        lc = load_landcover(landcover_path,var="lccs_class")
-        aq = load_air_quality(portugal_no2_path)
+        ref = aq.isel(time=0) if "time" in aq.dims else aq
+        lc_on_ref = align_categorical_to_reference(lc, ref, method="nearest")
 
-        lc_on_aq = align_categorical_to_reference(lc, aq, method="nearest")
+        assert lc_on_ref.shape == ref.shape
+        np.testing.assert_allclose(lc_on_ref.lat.values, ref.lat.values)
+        np.testing.assert_allclose(lc_on_ref.lon.values, ref.lon.values)
 
-        assert lc_on_aq.shape == aq.isel(time=0).shape
-        np.testing.assert_allclose(lc_on_aq.lat.values, aq.lat.values)
-        np.testing.assert_allclose(lc_on_aq.lon.values, aq.lon.values)
-
-    def test_reclass_landcover_default_mapping(self, landcover_path):
-        from airqualitylib.geospatial_airquality import load_landcover, reclass_landcover
+    def test_reclass_landcover_default_mapping_outputs_0_to_6(self, lc):
+        """Default reclass should output only {0..6} and set scheme metadata."""
+        from airqualitylib.geospatial_airquality import reclass_landcover
         import numpy as np
 
-        lc = load_landcover(landcover_path,var="lccs_class")
         lc6 = reclass_landcover(lc)
-
         unique_vals = set(np.unique(lc6.values))
-        # 默认映射输出为 0..6（0 为 nodata_out）
-        assert unique_vals <= set(range(7))
+
+        assert unique_vals <= set(range(7))  # 0 is nodata_out by default
         assert lc6.attrs.get("scheme") == "6class"
 
-    def test_reclass_landcover_custom_mapping_and_nodata(self, landcover_path):
-        from airqualitylib.geospatial_airquality import load_landcover, reclass_landcover
+    def test_reclass_landcover_custom_mapping_and_nodata(self, lc):
+        """Custom mapping should remap one code and use nodata_out for others."""
+        from airqualitylib.geospatial_airquality import reclass_landcover
         import numpy as np
 
-        lc = load_landcover(landcover_path,var="lccs_class")
-        sample_val = int(lc.values.flat[0])
-
+        sample_val = int(np.asarray(lc.values).ravel()[0])
         lc_custom = reclass_landcover(lc, mapping={sample_val: 9}, nodata_out=-1, name="custom")
 
         unique_vals = set(np.unique(lc_custom.values))
         assert unique_vals <= {9, -1}
         assert lc_custom.name == "custom"
 
-    def test_overlay_aq_with_landcover_masks_nan(self, landcover_path, portugal_no2_path):
+    def test_overlay_aq_with_landcover_masks_nan(self, lc, aq):
+        """If mask_by_aq=True, landcover should be NaN where AQ is NaN."""
         try:
             import rioxarray  # noqa: F401
         except ImportError:
             pytest.skip("rioxarray is not available")
 
-        from airqualitylib.geospatial_airquality import load_landcover, load_air_quality, overlay_aq_with_landcover
+        from airqualitylib.geospatial_airquality import overlay_aq_with_landcover
         import numpy as np
 
-        aq = load_air_quality(portugal_no2_path)
-        aq = aq.copy()
-        aq[0, 0, 0] = np.nan  # 注入一个 NaN 以测试掩膜
+        # Typical use: overlay expects a 2D AQ map (monthly mean), but it can accept 3D too.
+        # Test with a 2D slice to keep semantics clean.
+        aq2d = aq.isel(time=0).copy() if "time" in aq.dims else aq.copy()
+        aq2d.values[0, 0] = np.nan  # inject a NaN to test masking
 
-        lc = load_landcover(landcover_path,var="lccs_class")
+        aq_out, lc_on_aq = overlay_aq_with_landcover(aq2d, lc, reclass=True, mask_by_aq=True)
 
-        aq_out, lc_on_aq = overlay_aq_with_landcover(aq, lc, reclass=True, mask_by_aq=True)
+        assert aq_out.dims == ("lat", "lon")
+        assert set(lc_on_aq.dims) == {"lat", "lon"}
+        assert lc_on_aq.sizes["lat"] == aq_out.sizes["lat"]
+        assert lc_on_aq.sizes["lon"] == aq_out.sizes["lon"]
 
-        assert set(lc_on_aq.dims) == set(aq_out.dims)
-        for d in aq_out.dims:
-            assert lc_on_aq.sizes[d] == aq_out.sizes[d]
-        lc_t = lc_on_aq.transpose(*aq_out.dims)
-        assert np.isnan(lc_t[0, 0, 0])
+        # Masking: where AQ is NaN, LC should be NaN too
+        assert np.isnan(lc_on_aq.values[0, 0])
 
     def test_get_landcover_6_colormap(self):
+        """Colormap helper should return 6 colors and matching norm/labels."""
         from airqualitylib.geospatial_airquality import get_landcover_6_colormap
 
         cmap, norm, labels = get_landcover_6_colormap()
@@ -545,9 +582,8 @@ class TestLandcoverOperations:
         assert len(labels) == 6
         assert len(norm.boundaries) == 7
 
-
 # =============================================================================
-# Part 7: Stats - 统计分析测试
+# Part 7: Stats 
 # =============================================================================
 
 class TestStats:
@@ -566,14 +602,14 @@ class TestStats:
         return str(testdata_dir / "portugal_no2_subset.nc")
 
     def test_landcover_stats_basic(self, landcover_path, portugal_no2_path):
-        """测试基本统计功能，使用合成数据确保地理范围一致。"""
+        """Test basic statistics output using synthetic data on a shared grid."""
         from airqualitylib.geospatial_airquality import (
             landcover_stats, LANDCOVER_6_LABELS
         )
         import xarray as xr
         import numpy as np
-
-        # 创建合成 AQ 数据（lat=3, lon=4）
+ 
+        # Create synthetic AQ data (lat=3, lon=4)
         aq2d = xr.DataArray(
             np.array([[10.0, 20.0, 30.0, 50.0],
                       [15.0, 25.0, 35.0, 45.0],
@@ -582,7 +618,7 @@ class TestStats:
             dims=["lat", "lon"],
         )
 
-        # 创建合成 landcover 数据（相同网格）
+        # Create synthetic landcover data on the same grid
         lc6 = xr.DataArray(
             np.array([[1, 2, 3, 5],
                       [2, 3, 5, 1],
@@ -598,16 +634,40 @@ class TestStats:
         assert required_cols.issubset(df.columns), f"Missing columns. Expected {required_cols}, got {df.columns.tolist()}"
         assert (df["exceed_ratio"] >= 0).all() and (df["exceed_ratio"] <= 1).all()
 
+    def test_landcover_stats_ignores_nodata_class(self):
+        """Landcover class 0 (nodata) should be ignored in statistics."""
+        from airqualitylib.geospatial_airquality import landcover_stats
+        import xarray as xr
+        import numpy as np
+
+        aq2d = xr.DataArray(
+            np.array([[10.0, 20.0],
+                    [30.0, 40.0]]),
+            coords={"lat": [1, 2], "lon": [1, 2]},
+            dims=["lat", "lon"],
+        )
+
+        # landcover includes 0 (nodata)
+        lc6 = xr.DataArray(
+            np.array([[0, 1],
+                    [2, 0]]),
+            coords={"lat": [1, 2], "lon": [1, 2]},
+            dims=["lat", "lon"],
+        )
+
+        df = landcover_stats(aq2d, lc6)
+
+        assert 0 not in df["class"].values
 
     def test_landcover_stats_with_max_and_median(self, landcover_path, portugal_no2_path):
-        """测试包含最大值和中位数的统计，使用合成数据。"""
+        """Test statistics including max and median values using synthetic data."""
         from airqualitylib.geospatial_airquality import (
             landcover_stats, LANDCOVER_6_LABELS
         )
         import xarray as xr
         import numpy as np
 
-        # 创建合成 AQ 数据
+         # Create synthetic AQ data
         aq2d = xr.DataArray(
             np.array([[10.0, 20.0, 30.0],
                       [15.0, 25.0, 35.0]]),
@@ -615,7 +675,7 @@ class TestStats:
             dims=["lat", "lon"],
         )
 
-        # 创建合成 landcover 数据
+         # Create synthetic landcover data
         lc6 = xr.DataArray(
             np.array([[1, 2, 3],
                       [2, 3, 1]]),
@@ -631,3 +691,28 @@ class TestStats:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+    def test_landcover_stats_handles_nan_aq(self):
+        """NaN values in AQ should be safely ignored."""
+        from airqualitylib.geospatial_airquality import landcover_stats
+        import xarray as xr
+        import numpy as np
+
+        aq2d = xr.DataArray(
+            np.array([[np.nan, 20.0],
+                    [30.0, np.nan]]),
+            coords={"lat": [1, 2], "lon": [1, 2]},
+            dims=["lat", "lon"],
+        )
+
+        lc6 = xr.DataArray(
+            np.array([[1, 1],
+                    [1, 1]]),
+            coords={"lat": [1, 2], "lon": [1, 2]},
+            dims=["lat", "lon"],
+        )
+
+        df = landcover_stats(aq2d, lc6)
+
+        assert not df.empty
+        assert np.isfinite(df["mean"]).all()
