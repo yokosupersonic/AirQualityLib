@@ -9,7 +9,7 @@ Lightweight helpers for geospatial air-quality analysis, designed to support com
 
 <p align="center">
   <em>
-    Monthly mean NO₂ concentration and land-cover classification after preprocessing and spatial alignment (example result)
+    Monthly mean concentration and land-cover classification after preprocessing (example result)
   </em>
 </p>
 
@@ -19,7 +19,7 @@ Lightweight helpers for geospatial air-quality analysis, designed to support com
 
 <p align="center">
   <em>
-    Spatial overlay of NO₂ with land-cover classes and corresponding land-cover–stratified statistics (example result)
+    Spatial overlay with land-cover classes and land-cover–stratified statistics (example result)
   </em>
 </p>
 
