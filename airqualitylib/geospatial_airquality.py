@@ -478,7 +478,6 @@ def plot_landcover_6_map(
     except Exception as e:
         raise ImportError("matplotlib is required for plotting.") from e
 
-    # 固定为“分类图友好”的尺寸（不使用全局）
     figsize = (6.5, 6.5)
     dpi = PLOT_DPI
 
