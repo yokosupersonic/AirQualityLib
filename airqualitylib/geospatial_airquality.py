@@ -243,12 +243,12 @@ LANDCOVER_6_LABELS: dict[int, str] = {
 }
 
 LANDCOVER_6_COLORS: dict[int, str] = {
-    1: "#ffffcc",  # Agriculture
-    2: "#228B22",  # Forest
-    3: "#7CFC00",  # Grassland
-    4: "#40E0D0",  # Wetland
-    5: "#B22222",  # Settlement
-    6: "#D3D3D3",  # Other
+    1: "#E6E2AF",  # Agriculture - warm light beige
+    2: "#3B7A57",  # Forest - deep green
+    3: "#A6D854",  # Grassland - fresh light green
+    4: "#66C2A5",  # Wetland - teal
+    5: "#B2182B",  # Settlement - dark red
+    6: "#9E9E9E",  # Other - neutral gray
 }
 
 
@@ -335,6 +335,12 @@ def landcover_stats(
     if pd is None:
         raise ImportError("pandas is required for landcover_stats().")
 
+
+
+    if class_labels is None:
+        class_labels = LANDCOVER_6_LABELS
+
+
     lc6_2d = lc6.isel(time=0) if "time" in lc6.dims else lc6
 
     valid = np.isfinite(aq2d.values)
@@ -383,6 +389,58 @@ def get_landcover_6_colormap():
     norm = BoundaryNorm(bounds, cmap.N)
 
     return cmap, norm, labels
+
+
+def plot_landcover_6_map(
+    lc6_on_aq,
+    *,
+    title: str = "Landcover (6 classes)",
+    savepath: str | None = None,
+    figsize: tuple[float, float] = (6, 6),
+):
+    """
+    Plot reclassified landcover (6 classes) using the library's unified colors/labels.
+
+    Parameters
+    ----------
+    lc6_on_aq : xarray.DataArray
+        Landcover already reclassified to 1..6 (optionally with time dim).
+    title : str
+        Plot title.
+    savepath : str | None
+        If provided, save PNG.
+    figsize : (w,h)
+        Figure size.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as e:
+        raise ImportError("matplotlib is required for plotting.") from e
+
+    # squeeze to 2D
+    lc2d = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
+
+    cmap, norm, labels = get_landcover_6_colormap()
+
+    fig, ax = plt.subplots(figsize=figsize)
+    im = lc2d.plot(
+        ax=ax,
+        cmap=cmap,
+        norm=norm,
+        add_colorbar=False,
+    )
+
+    cbar = plt.colorbar(im, ax=ax, ticks=[1, 2, 3, 4, 5, 6])
+    cbar.ax.set_yticklabels(labels)
+
+    ax.set_title(title)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+
+    fig.tight_layout()
+    if savepath:
+        plt.savefig(savepath, dpi=200, bbox_inches="tight")
+    plt.show()
 
 # =========================================================
 # 7) Export & Visualization
