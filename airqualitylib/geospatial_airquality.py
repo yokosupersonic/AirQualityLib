@@ -465,25 +465,26 @@ def plot_landcover_6_map(
     *,
     title: str = "Landcover (6 classes)",
     savepath: str | None = None,
-    figsize: tuple[float, float] | None = None,
-    dpi: int | None = None,
     show: bool = True,
 ):
     """
     Plot reclassified landcover (6 classes) using the library's unified colors/labels.
-    Output PNG size is unified by default via PLOT_FIGSIZE/PLOT_DPI.
+
+    This plot intentionally uses a near-square figure size,
+    independent from global AQ plot settings.
     """
     try:
         import matplotlib.pyplot as plt
     except Exception as e:
         raise ImportError("matplotlib is required for plotting.") from e
 
-    if figsize is None:
-        figsize = PLOT_FIGSIZE
-    if dpi is None:
-        dpi = PLOT_DPI
+    # 固定为“分类图友好”的尺寸（不使用全局）
+    figsize = (6.5, 6.5)
+    dpi = PLOT_DPI
 
+    # squeeze to 2D
     lc2d = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
+
     cmap, norm, labels = get_landcover_6_colormap()
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -503,6 +504,7 @@ def plot_landcover_6_map(
     ax.set_ylabel("Latitude")
 
     fig.tight_layout()
+
     if savepath:
         fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
 
