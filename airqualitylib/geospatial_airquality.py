@@ -509,17 +509,20 @@ def plot_landcover_stats(
     labels = df["label"].tolist()
     means = df["mean"].values
     ex = df["exceed_ratio"].values
+    
+    # Get colors for each landcover class
+    colors = [LANDCOVER_6_COLORS.get(int(c), "#CCCCCC") for c in df["class"].values]
 
     fig, ax1 = plt.subplots(figsize=(9, 4.8))
-    ax1.bar(x, means)
-    ax1.set_ylabel(ylabel_left)
+    ax1.bar(x, means, color=colors, edgecolor='black', linewidth=0.5)
+    ax1.set_ylabel(ylabel_left, fontsize=12)
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=0)
-    ax1.set_title(title)
+    ax1.set_title(title, fontsize=14,)
 
     ax2 = ax1.twinx()
-    ax2.plot(x, ex, marker="o")
-    ax2.set_ylabel(ylabel_right)
+    ax2.plot(x, ex, marker="o", color='darkred', linewidth=2, markersize=8)
+    ax2.set_ylabel(ylabel_right, fontsize=12)
     ax2.set_ylim(0, 1)
 
     fig.tight_layout()
