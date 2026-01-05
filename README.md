@@ -39,6 +39,51 @@ The diagram below illustrates the typical end-to-end workflow supported by AirQu
 ![AirQualityLib workflow](images/workflow.svg)
 
 ---
+## Data sources and selection
+This project is designed for European-scale air-quality analysis and integrates
+official Copernicus datasets for air quality, land cover, and administrative boundaries.
+
+### Air quality data (CAMS Europe)
+Air-quality fields are obtained from the **Copernicus Atmosphere Monitoring Service (CAMS) –
+Europe Air Quality Reanalysis**:
+
+- Source: https://ads.atmosphere.copernicus.eu/datasets/cams-europe-air-quality-reanalyses
+- Variable: NO₂, PM2.5, PM10 
+- Model: Ensemble
+- Vertical level: Level 0 (surface)
+- Type: Validated Reanalysis
+- Temporal resolution: Hourly (original product)
+- Spatial coverage: Europe
+
+The library supports arbitrary temporal aggregation; in the example workflow,
+hourly fields are aggregated to monthly mean concentrations.
+
+### Administrative boundaries
+European administrative boundaries are used to define areas of interest (AOIs):
+
+- Source: EU_countryboundaries.gpkg (provided in the example data package)
+- Data type: country-level administrative boundaries (GeoPackage)
+- Coverage: Europe
+- CRS: WGS84 (EPSG:4326)
+
+Administrative boundaries are used to select AOIs (e.g., Italy or Portugal) and to
+spatially clip air-quality and land-cover rasters.
+
+### Land cover data (Copernicus C3S)
+Land-cover information is obtained from the **Copernicus Climate Change Service (C3S)
+global land-cover product**:
+
+- Source: https://cds.climate.copernicus.eu/datasets/satellite-land-cover
+- Available years: 2016–2022
+- Spatial resolution: 300 m
+- Classification system: LCCS
+- Version: v2.1.1
+- Geographical area: Sub-region extraction (e.g. North 72°, West −25°, South 30°, East 45°)
+
+Land-cover data are treated as a categorical raster and can be reclassified and
+spatially aligned to the air-quality grid for land-cover–stratified analysis.
+
+---
 
 ## Install
 - Conda (recommended):
