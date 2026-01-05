@@ -251,6 +251,12 @@ LANDCOVER_6_COLORS: dict[int, str] = {
     6: "#9E9E9E",  # Other - neutral gray
 }
 
+# -----------------------------
+# Unified plotting style (ALL PNG SAME SIZE)
+# -----------------------------
+PLOT_FIGSIZE: tuple[float, float] = (11.5, 5.2)  # 统一大小
+PLOT_DPI: int = 200                              # 统一清晰度
+
 
 def reclass_landcover(lc_da, mapping: dict[int, int] | None = None, nodata_out: int = 0, name: str = "landcover_6"):
     """Reclass landcover codes into 6 macro classes using DEFAULT_LCCS_TO_6CLASS."""
@@ -390,39 +396,98 @@ def get_landcover_6_colormap():
 
     return cmap, norm, labels
 
-
-def plot_landcover_6_map(
-    lc6_on_aq,
+def plot_monthly_mean_map(
+    aq2d,
     *,
-    title: str = "Landcover (6 classes)",
+    pollutant_name: str = "Pollutant",
+    units: str = "ug/m3",
+    title: str | None = None,
+    cmap_aq: str = "Blues",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    figsize: tuple[float, float] | None = None,
+    dpi: int | None = None,
     savepath: str | None = None,
-    figsize: tuple[float, float] = (6, 6),
+    show: bool = True,
 ):
     """
-    Plot reclassified landcover (6 classes) using the library's unified colors/labels.
-
-    Parameters
-    ----------
-    lc6_on_aq : xarray.DataArray
-        Landcover already reclassified to 1..6 (optionally with time dim).
-    title : str
-        Plot title.
-    savepath : str | None
-        If provided, save PNG.
-    figsize : (w,h)
-        Figure size.
+    Plot monthly mean pollutant map (NO2/PM2.5/PM10...) in unified style & size.
+    Output PNG size is unified by default via PLOT_FIGSIZE/PLOT_DPI.
     """
     try:
         import matplotlib.pyplot as plt
     except Exception as e:
         raise ImportError("matplotlib is required for plotting.") from e
 
-    # squeeze to 2D
-    lc2d = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
+    if figsize is None:
+        figsize = PLOT_FIGSIZE
+    if dpi is None:
+        dpi = PLOT_DPI
 
+    if title is None:
+        title = f"{pollutant_name} monthly mean"
+
+    lon = aq2d["lon"].values
+    lat = aq2d["lat"].values
+    extent = [float(lon.min()), float(lon.max()), float(lat.min()), float(lat.max())]
+    origin = "upper" if (lat.size > 1 and lat[0] > lat[-1]) else "lower"
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    im = ax.imshow(
+        aq2d.values,
+        origin=origin,
+        extent=extent,
+        cmap=cmap_aq,
+        vmin=vmin,
+        vmax=vmax,
+        alpha=0.95
+    )
+
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label(f"{pollutant_name} ({units})")
+
+    ax.set_title(title)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+
+    fig.tight_layout()
+    if savepath:
+        fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+def plot_landcover_6_map(
+    lc6_on_aq,
+    *,
+    title: str = "Landcover (6 classes)",
+    savepath: str | None = None,
+    figsize: tuple[float, float] | None = None,
+    dpi: int | None = None,
+    show: bool = True,
+):
+    """
+    Plot reclassified landcover (6 classes) using the library's unified colors/labels.
+    Output PNG size is unified by default via PLOT_FIGSIZE/PLOT_DPI.
+    """
+    try:
+        import matplotlib.pyplot as plt
+    except Exception as e:
+        raise ImportError("matplotlib is required for plotting.") from e
+
+    if figsize is None:
+        figsize = PLOT_FIGSIZE
+    if dpi is None:
+        dpi = PLOT_DPI
+
+    lc2d = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
     cmap, norm, labels = get_landcover_6_colormap()
 
     fig, ax = plt.subplots(figsize=figsize)
+
     im = lc2d.plot(
         ax=ax,
         cmap=cmap,
@@ -439,8 +504,13 @@ def plot_landcover_6_map(
 
     fig.tight_layout()
     if savepath:
-        plt.savefig(savepath, dpi=200, bbox_inches="tight")
-    plt.show()
+        fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
 
 # =========================================================
 # 7) Export & Visualization
@@ -460,75 +530,157 @@ def export_landcover_tif(lc6_on_aq, out_tif: str, *, nodata: int = 0):
     da.rio.to_raster(out_tif)
     return out_tif
 
-
 def plot_monthly_map_with_landcover_overlay(
     aq2d,
     lc6_on_aq,
     *,
-    title: str = "Monthly mean (AOI)",
-    landcover_alpha: float = 0.25,
-    show_landcover: bool = True,
+    pollutant_name: str = "Pollutant",
+    units: str = "ug/m3",
+    title: str | None = None,
+    landcover_alpha: float = 0.95,
+    linewidth: float = 0.4,
+    cmap_aq: str = "Blues",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    figsize: tuple[float, float] | None = None,
+    dpi: int | None = None,
     savepath: str | None = None,
+    show: bool = True,
 ):
-    """Plot AQ map; optionally overlay landcover classes."""
+    """
+    Plot AQ monthly mean map as background, and draw landcover class boundaries as contour lines.
+    Legend is placed outside (right side) to avoid overlap.
+    Output PNG size is unified by default via PLOT_FIGSIZE/PLOT_DPI.
+    """
     try:
         import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
     except Exception as e:
         raise ImportError("matplotlib is required for plotting.") from e
 
-    lc2d = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
+    if figsize is None:
+        figsize = PLOT_FIGSIZE
+    if dpi is None:
+        dpi = PLOT_DPI
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    aq2d.plot(ax=ax)
+    lc_plot = lc6_on_aq.isel(time=0) if "time" in lc6_on_aq.dims else lc6_on_aq
+    aq_plot = aq2d
+
+    lon = aq_plot["lon"].values
+    lat = aq_plot["lat"].values
+    extent = [float(lon.min()), float(lon.max()), float(lat.min()), float(lat.max())]
+    origin = "upper" if (lat.size > 1 and lat[0] > lat[-1]) else "lower"
+
+    cmap_lc, norm_lc, labels_lc = get_landcover_6_colormap()
+
+    if title is None:
+        title = f"Monthly Mean {pollutant_name} with Land Cover Overlay"
+
+    fig, ax = plt.subplots(figsize=figsize)
+    fig.subplots_adjust(right=0.78)
+
+    im = ax.imshow(
+        aq_plot.values,
+        origin=origin,
+        extent=extent,
+        cmap=cmap_aq,
+        vmin=vmin,
+        vmax=vmax,
+        alpha=0.9
+    )
+
+    cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cb.set_label(f"{pollutant_name} ({units})")
+
+    for cls_id in range(1, 7):
+        mask = (lc_plot.values == cls_id).astype(float)
+        ax.contour(
+            mask,
+            levels=[0.5],
+            origin=origin,
+            extent=extent,
+            linewidths=linewidth,
+            colors=[cmap_lc(norm_lc(cls_id))],
+            alpha=landcover_alpha
+        )
+
+    patches = [
+        mpatches.Patch(color=cmap_lc(norm_lc(i)), label=lab)
+        for i, lab in zip(range(1, 7), labels_lc)
+    ]
+
+    fig.legend(
+        handles=patches,
+        title="Land cover (6 classes)",
+        loc="center left",
+        bbox_to_anchor=(0.82, 0.5),
+        frameon=True
+    )
+
     ax.set_title(title)
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
 
-    if show_landcover:
-        lc2d.plot(ax=ax, alpha=landcover_alpha, add_colorbar=False)
-
-    fig.tight_layout()
     if savepath:
-        plt.savefig(savepath, dpi=200, bbox_inches="tight")
-    plt.show()
+        fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def plot_landcover_stats(
     df,
     *,
-    title: str = "NO₂ by land cover",
-    ylabel_left: str = "Mean NO₂ (µg/m³)",
+    title: str = "Pollutant by land cover",
+    ylabel_left: str = "Mean (ug/m3)",
     ylabel_right: str = "Exceed ratio",
+    figsize: tuple[float, float] | None = None,
+    dpi: int | None = None,
     savepath: str | None = None,
+    show: bool = True,
 ):
-    """Dual-axis plot for landcover mean and exceed ratio."""
+    """Dual-axis plot for landcover mean and exceed ratio. Output size unified by default."""
     try:
         import matplotlib.pyplot as plt
     except Exception as e:
         raise ImportError("matplotlib is required for plotting.") from e
 
+    if figsize is None:
+        figsize = PLOT_FIGSIZE
+    if dpi is None:
+        dpi = PLOT_DPI
+
     x = np.arange(len(df))
     labels = df["label"].tolist()
     means = df["mean"].values
     ex = df["exceed_ratio"].values
-    
-    # Get colors for each landcover class
-    colors = [LANDCOVER_6_COLORS.get(int(c), "#CCCCCC") for c in df["class"].values]
 
-    fig, ax1 = plt.subplots(figsize=(9, 4.8))
-    ax1.bar(x, means, color=colors, edgecolor='black', linewidth=0.5)
-    ax1.set_ylabel(ylabel_left, fontsize=12)
+    # bar colors follow landcover class colors
+    bar_colors = [LANDCOVER_6_COLORS.get(int(c), "#CCCCCC") for c in df["class"].values]
+
+    fig, ax1 = plt.subplots(figsize=figsize)
+
+    ax1.bar(x, means, color=bar_colors, edgecolor="black", linewidth=0.5)
+    ax1.set_ylabel(ylabel_left)
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=0)
-    ax1.set_title(title, fontsize=14,)
+    ax1.set_title(title)
 
     ax2 = ax1.twinx()
-    ax2.plot(x, ex, marker="o", color='darkred', linewidth=2, markersize=8)
-    ax2.set_ylabel(ylabel_right, fontsize=12)
+    ax2.plot(x, ex, marker="o", linewidth=2)
+    ax2.set_ylabel(ylabel_right)
     ax2.set_ylim(0, 1)
 
     fig.tight_layout()
     if savepath:
-        plt.savefig(savepath, dpi=200, bbox_inches="tight")
-    plt.show()
+        fig.savefig(savepath, dpi=dpi, bbox_inches="tight")
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 # =========================================================
